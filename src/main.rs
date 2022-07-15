@@ -14,7 +14,7 @@ pub trait BitIndex<T, const I: usize> {
 pub trait BitIndexMut<T, const I: usize> {
     fn bit_mut(&mut self) -> &mut Bit<T, I>;
 }
-use testing_binary::bitfield;
+use testing_bin::bitfield;
 bitfield!(
     GeneratedBitField,
     u32,
@@ -70,6 +70,8 @@ impl<const R: Range<usize>> fmt::Display for BitRange<u8, R> {
 }
 
 impl<const R: Range<usize>> BitRange<u64, R> {
+    const MASK: u64 =
+        unsafe { u64::MAX.unchecked_shl(R.start as u64) & u64::MAX.unchecked_shr(R.start as u64) };
     const fn data(&self) -> *const u64 {
         let a = self as *const Self;
         a as *const u64
@@ -97,6 +99,8 @@ impl<const R: Range<usize>> BitRange<u32, R> {
     }
 }
 impl<const R: Range<usize>> BitRange<u16, R> {
+    const MASK: u16 =
+        unsafe { u16::MAX.unchecked_shl(R.start as u16) & u16::MAX.unchecked_shr(R.start as u16) };
     const fn data(&self) -> *const u16 {
         let a = self as *const Self;
         a as *const u16
@@ -109,6 +113,8 @@ impl<const R: Range<usize>> BitRange<u16, R> {
     }
 }
 impl<const R: Range<usize>> BitRange<u8, R> {
+    const MASK: u8 =
+        unsafe { u8::MAX.unchecked_shl(R.start as u8) & u8::MAX.unchecked_shr(R.start as u8) };
     const fn data(&self) -> *const u8 {
         let a = self as *const Self;
         a as *const u8
@@ -129,10 +135,8 @@ impl<const R: Range<usize>> AddAssign<u32> for BitRange<u32, R> {
 #[allow(clippy::from_over_into)]
 impl<const R: Range<usize>> Into<u64> for BitRange<u64, R> {
     fn into(self) -> u64 {
-        let start_mask = unsafe { u64::MAX.unchecked_shl(R.start as u64) };
-        let end_mask = unsafe { u64::MAX.unchecked_shr(R.start as u64) };
-        let mask = end_mask & start_mask;
-        mask & unsafe { *self.data() }
+        let a = Self::MASK & unsafe { *self.data() };
+        a >> R.start
     }
 }
 #[allow(clippy::from_over_into)]
@@ -145,19 +149,15 @@ impl<const R: Range<usize>> Into<u32> for BitRange<u32, R> {
 #[allow(clippy::from_over_into)]
 impl<const R: Range<usize>> Into<u16> for BitRange<u16, R> {
     fn into(self) -> u16 {
-        let start_mask = unsafe { u16::MAX.unchecked_shl(R.start as u16) };
-        let end_mask = unsafe { u16::MAX.unchecked_shr(R.start as u16) };
-        let mask = end_mask & start_mask;
-        mask & unsafe { *self.data() }
+        let a = Self::MASK & unsafe { *self.data() };
+        a >> R.start
     }
 }
 #[allow(clippy::from_over_into)]
 impl<const R: Range<usize>> Into<u8> for BitRange<u8, R> {
     fn into(self) -> u8 {
-        let start_mask = unsafe { u8::MAX.unchecked_shl(R.start as u8) };
-        let end_mask = unsafe { u8::MAX.unchecked_shr(R.start as u8) };
-        let mask = end_mask & start_mask;
-        mask & unsafe { *self.data() }
+        let a = Self::MASK & unsafe { *self.data() };
+        a >> R.start
     }
 }
 
@@ -392,6 +392,31 @@ impl<const P: usize> Eq for Bit<u32, P> {}
 impl<const P: usize> Eq for Bit<u16, P> {}
 impl<const P: usize> Eq for Bit<u8, P> {}
 
+struct MyBitField{
+    pub data: u8,
+    pub bits: (MyBit<u8,0>,MyBit<u8,1>,MyBit<u8,2>,MyBit<u8,3>,MyBit<u8,4>,MyBit<u8,5>,MyBit<u8,6>,MyBit<u8,7>),
+    pub ranges: (MyBitRange<u8,{1..4}>,MyBitRange<u8,{5..7}>)
+}
+struct MyBit<T,const P:usize>(PhantomData<T>);
+struct MyBitRange<T,const R: Range<usize>>(PhantomData<T>);
+impl MyBitField {
+    fn ptr(&self) -> *const Self {
+        self as *const Self
+    }
+}
+impl<T, const P:usize> MyBit<T,P> {
+    fn ptr(&self) -> *const T {
+        let a = self as *const Self;
+        a as *const T
+    }
+}
+impl<T, const R: Range<usize>> MyBitRange<T,R> {
+    fn ptr(&self) -> *const T{
+        let a  = self as *const Self;
+        a as *const T
+    }
+}
+
 fn main() {
     println!("started");
     let mut bitfield = GeneratedBitField::from(7);
@@ -402,6 +427,41 @@ fn main() {
     );
     println!("size_of::<Bit<u16,10>>(): {}", size_of::<Bit<u16, 10>>());
     println!("bitfield ptr: {:?}", &bitfield as *const GeneratedBitField);
+
+    // let ptr_test = PointerTesting { a: 2u32, b:
+    // (InnerPointerTesting(PhantomData),InnerPointerTesting(PhantomData),
+    // InnerPointerTesting(PhantomData)),c:(InnerRangeTesting(PhantomData),
+    let ptr_test = MyBitField {
+        data: 15,
+        bits: (
+            MyBit(PhantomData),
+            MyBit(PhantomData),
+            MyBit(PhantomData),
+            MyBit(PhantomData),
+            MyBit(PhantomData),
+            MyBit(PhantomData),
+            MyBit(PhantomData),
+            MyBit(PhantomData),
+        ),
+        ranges: (
+            MyBitRange(PhantomData),
+            MyBitRange(PhantomData),
+        ),
+    };
+    println!(
+        "ptrs: {:?} | {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} | {:?} {:?}",
+        ptr_test.ptr(),
+        ptr_test.bits.0.ptr(),
+        ptr_test.bits.1.ptr(),
+        ptr_test.bits.2.ptr(),
+        ptr_test.bits.3.ptr(),
+        ptr_test.bits.4.ptr(),
+        ptr_test.bits.5.ptr(),
+        ptr_test.bits.6.ptr(),
+        ptr_test.bits.7.ptr(),
+        ptr_test.ranges.0.ptr(),
+        ptr_test.ranges.1.ptr()
+    );
 
     *bitfield.RANGE1_mut() += 2;
     println!("bitfield: {:08b} | {:?} | {}", bitfield, bitfield, bitfield);
