@@ -14,7 +14,7 @@ pub trait BitIndex<T, const I: usize> {
 pub trait BitIndexMut<T, const I: usize> {
     fn bit_mut(&mut self) -> &mut Bit<T, I>;
 }
-use testing_bin::bitfield;
+use testing_binary::bitfield;
 bitfield!(
     GeneratedBitField,
     u32,
@@ -392,39 +392,6 @@ impl<const P: usize> Eq for Bit<u32, P> {}
 impl<const P: usize> Eq for Bit<u16, P> {}
 impl<const P: usize> Eq for Bit<u8, P> {}
 
-struct PointerTesting<T> {
-    pub a: T,
-    pub b: (
-        InnerPointerTesting<T>,
-        InnerPointerTesting<T>,
-        InnerPointerTesting<T>,
-    ),
-    pub c: (
-        InnerRangeTesting<T, { 4usize..10usize }>,
-        InnerRangeTesting<T, { 23usize..42usize }>,
-    ),
-}
-impl<T> PointerTesting<T> {
-    fn ptr(&self) -> *const Self {
-        self as *const Self
-    }
-}
-struct InnerPointerTesting<T>(PhantomData<T>);
-impl<T> InnerPointerTesting<T> {
-    fn ptr(&self) -> *const Self {
-        self as *const Self
-    }
-}
-struct InnerRangeTesting<T, const R: Range<usize>>(PhantomData<Range<T>>);
-impl<const R: Range<usize>> InnerRangeTesting<u32, R> {
-    const MASK: u32 =
-        unsafe { u32::MAX.unchecked_shl(R.start as u32) & u32::MAX.unchecked_shr(R.start as u32) };
-
-    fn ptr(&self) -> *const Self {
-        self as *const Self
-    }
-}
-
 fn main() {
     println!("started");
     let mut bitfield = GeneratedBitField::from(7);
@@ -435,31 +402,6 @@ fn main() {
     );
     println!("size_of::<Bit<u16,10>>(): {}", size_of::<Bit<u16, 10>>());
     println!("bitfield ptr: {:?}", &bitfield as *const GeneratedBitField);
-
-    // let ptr_test = PointerTesting { a: 2u32, b:
-    // (InnerPointerTesting(PhantomData),InnerPointerTesting(PhantomData),
-    // InnerPointerTesting(PhantomData)),c:(InnerRangeTesting(PhantomData),
-    let ptr_test = PointerTesting {
-        a: 2u32,
-        b: (
-            InnerPointerTesting(PhantomData),
-            InnerPointerTesting(PhantomData),
-            InnerPointerTesting(PhantomData),
-        ),
-        c: (
-            InnerRangeTesting(PhantomData),
-            InnerRangeTesting(PhantomData),
-        ),
-    };
-    println!(
-        "ptrs: {:?} | {:?} {:?} {:?} | {:?} {:?}",
-        ptr_test.ptr(),
-        ptr_test.b.0.ptr(),
-        ptr_test.b.1.ptr(),
-        ptr_test.b.2.ptr(),
-        ptr_test.c.0.ptr(),
-        ptr_test.c.1.ptr()
-    );
 
     *bitfield.RANGE1_mut() += 2;
     println!("bitfield: {:08b} | {:?} | {}", bitfield, bitfield, bitfield);
