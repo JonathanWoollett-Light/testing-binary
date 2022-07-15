@@ -126,12 +126,6 @@ impl<const R: Range<usize>> BitRange<u8, R> {
         b.as_mut()
     }
 }
-impl<const R: Range<usize>> AddAssign<u32> for BitRange<u32, R> {
-    fn add_assign(&mut self, x: u32) {
-        let a = Self::MASK & (x << R.start);
-        unsafe { *self.data_mut() += a }
-    }
-}
 #[allow(clippy::from_over_into)]
 impl<const R: Range<usize>> Into<u64> for BitRange<u64, R> {
     fn into(self) -> u64 {
@@ -462,7 +456,4 @@ fn main() {
         ptr_test.ranges.0.ptr(),
         ptr_test.ranges.1.ptr()
     );
-
-    *bitfield.RANGE1_mut() += 2;
-    println!("bitfield: {:08b} | {:?} | {}", bitfield, bitfield, bitfield);
 }
